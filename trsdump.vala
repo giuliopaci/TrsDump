@@ -439,14 +439,14 @@ namespace Trs
 							case "Sync":
 								Sync sync;
 								Sync.parse(reader, out sync);
-								Posix.stderr.printf("<Sync>\t%f\n", sync.time);
+								//Posix.stderr.printf("<Sync>\t%f\n", sync.time);
 								turn.tokens.resize(turn.tokens.length+1);
 								turn.tokens[turn.tokens.length-1] =  TurnToken() {type = TurnTokenType.SYNC, sync = sync};
 								break;
 							case "Event":
 								Event event;
 								Event.parse(reader, out event);
-								Posix.stderr.printf("<Event>\t%s\t%s\t%s\n", event.description, event.extent.to_string(), event.type.to_string());
+								//Posix.stderr.printf("<Event>\t%s\t%s\t%s\n", event.description, event.extent.to_string(), event.type.to_string());
 								turn.tokens.resize(turn.tokens.length+1);
 								turn.tokens[turn.tokens.length-1] = TurnToken() {type = TurnTokenType.EVENT, event = event};
 								break;
@@ -468,7 +468,7 @@ namespace Trs
 							string text = regex.replace (reader.const_value(), -1, 0, "");
 							if( ! ( text == "" ) )
 							{
-								Posix.stderr.printf("<Text>\t%s\n", text);
+								//Posix.stderr.printf("<Text>\t%s\n", text);
 								turn.tokens.resize(turn.tokens.length+1);
 								turn.tokens[turn.tokens.length-1] = TurnToken() {type = TurnTokenType.TEXT, text = text};
 							}
@@ -772,12 +772,22 @@ namespace TrsCLIOptions
 	static double min_time = 0.0;
 	static string output = null;
 	static string domain_object = null;
+	[CCode (array_length = false, array_null_terminated = true)]
 	static string[] filenames = null;
+	[CCode (array_length = false, array_null_terminated = true)]
+	static string[] ignore_filler = null;
+	[CCode (array_length = false, array_null_terminated = true)]
+	static string[] exclude_filler = null;
+	[CCode (array_length = false, array_null_terminated = true)]
+	static string[] include_filler = null;
 
 	static const OptionEntry[] Filter = {
 		{ "min-time", 'T', 0, OptionArg.DOUBLE, ref min_time, "Minimum interval time", (string) "0.0" },
 		{ "output", 'o', 0, OptionArg.FILENAME, ref output, "Output file", (string) "STDOUT" },
 		{ "domain_object", 'D', 0, OptionArg.STRING, ref domain_object, "Domain object of interest", (string) "NONE" },
+		{ "ignore_filler", 'X', 0, OptionArg.STRING_ARRAY, ref ignore_filler, "Ignore filler from transcription", (string) "NONE" },
+		{ "exclude_filler", 'E', 0, OptionArg.STRING_ARRAY, ref exclude_filler, "Exclude filler from transcription", (string) "NONE" },
+		{ "include_filler", 'I', 0, OptionArg.STRING_ARRAY, ref include_filler, "Include filler from transcription", (string) "NONE" },
 		{ null }
 	};
 
@@ -834,9 +844,29 @@ int main(string[] args) {
 //	Posix.stderr.printf("%f\n", transcription.episodes[0].sections[0].turns[0].start_time);
 //	Posix.stderr.printf("%f\n", transcription.episodes[0].sections[0].turns[0].end_time);
 
-	bool has_text = false;
-	bool has_noise = false;
-	bool has_domain_object = false;
+	HashTable<string,bool> ignore_filler = new HashTable<string,bool>( str_hash, str_equal);
+	foreach(string filler in TrsCLIOptions.ignore_filler)
+	{
+		ignore_filler.insert(filler, true);
+	}
+	HashTable<string,bool> exclude_filler = new HashTable<string,bool>( str_hash, str_equal);
+	foreach(string filler in TrsCLIOptions.exclude_filler)
+	{
+		exclude_filler.insert(filler, true);
+	}
+	HashTable<string,bool> include_filler = new HashTable<string,bool>( str_hash, str_equal);
+	foreach(string filler in TrsCLIOptions.include_filler)
+	{
+		include_filler.insert(filler, true);
+	}
+	int is_in_include = 0;
+	if(TrsCLIOptions.include_filler == null)
+	{
+		is_in_include++;
+	}
+	int is_in_exclude = 0;
+
+	bool is_interesting = false;
 	int idx_start = 0;
 	int idx = 0;
 	int idx_start_last_interesting = 0;
@@ -849,34 +879,65 @@ int main(string[] args) {
 		switch(tk.type)
 		{
 		case Trs.TurnTokenType.TEXT:
-			string text = tk.text;
+			//string text = tk.text;
 			//Posix.stdout.printf("%s\n", text);
-			has_text = true;
+			if( (is_in_include > 0) && (is_in_exclude == 0) )
+			{
+				is_interesting = true;
+			}
 			break;
 		case Trs.TurnTokenType.EVENT:
-			string text = tk.event.description;
+			//string text = tk.event.description;
+			if( include_filler.lookup_extended(tk.event.description, null, null) )
+			{
+				is_interesting = true;
+				switch(tk.event.extent)
+				{
+				case Trs.ExtentType.INSTANTANEOUS:
+					break;
+				case Trs.ExtentType.BEGIN:
+					is_in_include++;
+					break;
+				case Trs.ExtentType.END:
+					is_in_include--;
+					break;
+				}
+			}
+			if( exclude_filler.lookup_extended(tk.event.description, null, null) )
+			{
+				is_interesting = false;
+				switch(tk.event.extent)
+				{
+				case Trs.ExtentType.INSTANTANEOUS:
+					break;
+				case Trs.ExtentType.BEGIN:
+					is_in_exclude++;
+					break;
+				case Trs.ExtentType.END:
+					is_in_exclude--;
+					break;
+				}
+			}
 			switch(tk.event.type)
 			{
 			case Trs.EventType.NOISE:
-				has_noise = true;
 				break;
 			case Trs.EventType.ENTITIES:
-				has_domain_object = true;
 				break;
 			}
 			// Posix.stdout.printf("%s\n", text);
 			break;
 		case Trs.TurnTokenType.SYNC:
-			Trs.Sync sync = tk.sync;
+			//Trs.Sync sync = tk.sync;
 			// Posix.stdout.printf("%f\n", sync.time);
 				
-			if(has_text)
+			if(is_interesting)
 			{
 				
 				not_interesting_duration = tokens[idx_start].sync.time-tokens[idx_end_last_interesting].sync.time;
 				if(not_interesting_duration > TrsCLIOptions.min_time)
 				{
-					string text = get_tokens_text(ref tokens, idx_start_last_interesting, idx_end_last_interesting);
+					string text = get_tokens_text(ref tokens, idx_start_last_interesting, idx_end_last_interesting, ref ignore_filler, ref exclude_filler);
 					if(text.length > 0)
 					{
 						Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, text);
@@ -886,13 +947,12 @@ int main(string[] args) {
 				idx_end_last_interesting = idx;
 			}
 			idx_start = idx;
-			has_text = false;
-			has_noise = false;
+			is_interesting = false;
 			break;
 		}
 		idx++;
 	}
-	string text = get_tokens_text(ref tokens, idx_start_last_interesting, idx_end_last_interesting);
+	string text = get_tokens_text(ref tokens, idx_start_last_interesting, idx_end_last_interesting, ref ignore_filler, ref exclude_filler);
 	if(text.length > 0)
 	{
 		Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, text);
@@ -900,22 +960,46 @@ int main(string[] args) {
     return 0;
 }
 
-string get_tokens_text(ref Trs.TurnToken[] tokens, int idx_start, int idx_end)
+string get_tokens_text(ref Trs.TurnToken[] tokens, int idx_start, int idx_end, ref HashTable<string,bool> ignore_filler, ref HashTable<string,bool> exclude_filler)
 {
-				var builder = new StringBuilder ("");
-				for(int i = idx_start; i < idx_end; i++)
+	int is_in_exclude = 0;
+	var builder = new StringBuilder ("");
+	for(int i = idx_start; i < idx_end; i++)
+	{
+		switch(tokens[i].type)
+		{
+		case Trs.TurnTokenType.TEXT:
+			if(is_in_exclude == 0)
+			{
+				if(builder.len > 0)
 				{
-					switch(tokens[i].type)
+					builder.append_c(' ');
+				}
+				builder.append(tokens[i].text);
+			}
+			break;
+		case Trs.TurnTokenType.EVENT:
+			if( exclude_filler.lookup_extended(tokens[i].event.description, null, null) )
+			{
+				switch(tokens[i].event.extent)
+				{
+				case Trs.ExtentType.INSTANTANEOUS:
+					break;
+				case Trs.ExtentType.BEGIN:
+					is_in_exclude++;
+					break;
+				case Trs.ExtentType.END:
+					is_in_exclude--;
+					break;
+				}
+			}
+			else
+			{
+				if(is_in_exclude == 0)
+				{
+					if(tokens[i].event.type == Trs.EventType.NOISE)
 					{
-					case Trs.TurnTokenType.TEXT:
-						if(builder.len > 0)
-						{
-							builder.append_c(' ');
-						}
-						builder.append(tokens[i].text);
-						break;
-					case Trs.TurnTokenType.EVENT:
-						if(tokens[i].event.type == Trs.EventType.NOISE)
+						if( ! ignore_filler.lookup_extended(tokens[i].event.description, null, null) )
 						{
 							if(builder.len > 0)
 							{
@@ -923,8 +1007,11 @@ string get_tokens_text(ref Trs.TurnToken[] tokens, int idx_start, int idx_end)
 							}
 							builder.append(tokens[i].event.description);
 						}
-						break;
 					}
 				}
-				return builder.str;
+			}
+			break;
+		}
+	}
+	return builder.str;
 }
