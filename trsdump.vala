@@ -4,7 +4,7 @@
  * This software is released according to the Expat license below.
  *
  * Copyright: 2012, Giulio Paci <giulio.paci@pd.istc.cnr.it>
- *            2011-2012, Giulio Paci <giuliopaci@gmail.com>
+ *            2010-2012, Giulio Paci <giuliopaci@gmail.com>
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -940,7 +940,8 @@ int main(string[] args) {
 					string text = get_tokens_text(ref tokens, idx_start_last_interesting, idx_end_last_interesting, ref ignore_filler, ref exclude_filler);
 					if(text.length > 0)
 					{
-						Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, text);
+						//Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, text);
+						Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, transform_to_asr_text(text).up());
 					}
 					idx_start_last_interesting = idx_start;
 				}
@@ -955,7 +956,8 @@ int main(string[] args) {
 	string text = get_tokens_text(ref tokens, idx_start_last_interesting, idx_end_last_interesting, ref ignore_filler, ref exclude_filler);
 	if(text.length > 0)
 	{
-		Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, text);
+		//Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, text);
+		Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, transform_to_asr_text(text).up());
 	}
     return 0;
 }
@@ -1014,4 +1016,146 @@ string get_tokens_text(ref Trs.TurnToken[] tokens, int idx_start, int idx_end, r
 		}
 	}
 	return builder.str;
+}
+
+
+
+struct TokenizerR
+{
+	Regex regex;
+	int fragment_out;
+}
+
+string transform_to_asr_text(string text)
+{
+	var builder = new StringBuilder ("");
+	TokenizerR[] rules = {};
+	try
+	{
+		TokenizerR r;
+		Regex rx;
+		rx =  new Regex("[[:space:]]+", RegexCompileFlags.OPTIMIZE);
+		r = TokenizerR(){ fragment_out = 0, regex = rx };
+		rules += r;
+
+		rx = new Regex("(CA|O)RD:[[:digit:]]+[\\p{L}_]*", RegexCompileFlags.OPTIMIZE);
+		r = TokenizerR(){ fragment_out = 0, regex = rx };
+		rules += r;
+
+		rx = new Regex("([\\p{L}_]*[^aeiouyAEIOUY]')([aeiouyAEIOUY][\\p{L}_])", RegexCompileFlags.OPTIMIZE);
+		r = TokenizerR(){ fragment_out = 1, regex = rx };
+		rules += r;
+
+		rx = new Regex("([\\p{L}_]*[^aeiouAEIOU]')", RegexCompileFlags.OPTIMIZE);
+		r = TokenizerR(){ fragment_out = 1, regex = rx };
+		rules += r;
+
+		rx = new Regex("[\\p{L}_[:digit:]º°<>-]+", RegexCompileFlags.OPTIMIZE);
+		r = TokenizerR(){ fragment_out = 0, regex = rx };
+		rules += r;
+
+		rx = new Regex(".", RegexCompileFlags.OPTIMIZE);
+		r = TokenizerR(){ fragment_out = 0, regex = rx };
+		rules += r;
+	}
+	catch (RegexError e)
+	{
+		Posix.stderr.printf ("%s\n", e.message);
+		exit(-1);
+	}
+	string[] token_tokens = tokenize(rules, text);
+	foreach(string mtk in token_tokens)
+	{
+		MatchInfo match;
+		var punct = new Regex("^[^\\p{L}]*$", RegexCompileFlags.OPTIMIZE);
+		Posix.stderr.printf ("Token \"%s\"\n", mtk);
+		if ( punct.match_full(mtk, -1, 0, 0, out match ) )
+		{
+			Posix.stderr.printf ("Match \"%s\"\n", mtk);
+			continue;
+		}
+		var filler = new Regex("^<.*>$", RegexCompileFlags.OPTIMIZE);
+		if ( filler.match_full(mtk, -1, 0, 0, out match ) )
+		{
+			Posix.stderr.printf ("Fill  \"%s\"\n", mtk);
+		}
+		string[] tks = mtk.split("_");
+		if( ( tks.length > 0 ) && (builder.len > 0) )
+		{
+			builder.append_c(' ');
+		}
+		switch( tks.length )
+		{
+		case 0:
+			break;
+		case 1:
+			Posix.stderr.printf ("Fix   \"%s\"\n", tks[0]);
+			builder.append(tks[0]);
+			break;
+		case 2:
+			var number = new Regex("^(CA|O)RD:[[:digit:]]+$", RegexCompileFlags.OPTIMIZE);
+			if( number.match_full(tks[0], -1, 0, 0, out match ) )
+			{
+				Posix.stderr.printf ("Fix   \"%s\"\n", tks[1]);
+				builder.append(tks[1]);
+			}
+			else
+			{
+				Posix.stderr.printf ("Fix   \"%s\"\n", tks[0]);
+				builder.append(tks[0]);
+			}
+			break;
+		case 3:
+			Posix.stderr.printf ("Fix   \"%s\"\n", tks[1]);
+			builder.append(tks[1]);
+			break;
+		}
+		foreach(string microtk in tks)
+		{
+			Posix.stderr.printf ("      \"%s\"\n", microtk);
+		}
+	}
+	return builder.str;
+}
+
+
+string[] tokenize(TokenizerR[] rules, string text)
+{
+	string[] ret = {};
+	MatchInfo match;
+	size_t text_length = text.length;
+	int offset = 0;
+	int rule_nr = 0;
+	while( offset < text_length )
+	{
+		rule_nr = 0;
+		foreach(unowned TokenizerR rule in rules)
+		{
+			try
+			{
+				if ( rule.regex.match_full(text, -1, offset, RegexMatchFlags.NOTEMPTY|RegexMatchFlags.ANCHORED, out match ) )
+				{
+					int st, et;
+					if( match.fetch_pos(rule.fragment_out, out st, out et) )
+					{
+						string outstring = match.fetch(rule.fragment_out);
+						
+						if(rule_nr > 0)
+						{
+							ret += outstring;
+						}
+						offset = et;
+						break;
+					}
+				}
+			}
+			catch (RegexError e)
+			{
+				Posix.stderr.printf ("%s\n", e.message);
+				break;
+			}
+			rule_nr++;
+		}
+	}
+	return ret;
 }
