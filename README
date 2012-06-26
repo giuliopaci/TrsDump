@@ -1,0 +1,23 @@
+trsdump can be used to parse and extract information from a .trs file.
+
+REQUIREMENTS:
+To compile trsdump you will need at least:
+- vala compiler (0.16 has been tested)
+  - gcc
+  - pkg-config
+  - glib
+- libarchive (0.26 has been tested)
+- libxml2
+- make
+- sox
+- awk
+
+COMPILATION:
+Just type make.
+
+USAGE:
+Help is available by supplying -h option.
+The Makefile contains useful examples of usage: if you add .trs files
+to the INPUT_TRS_FILES variable, they will be processed by this tool.
+The output from the tool will be used to split files (using sox and
+awk) into three different test sets composed by small audio files.
