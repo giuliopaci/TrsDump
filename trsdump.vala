@@ -953,11 +953,30 @@ int main(string[] args) {
 		}
 		idx++;
 	}
+				
+	double end_time = tokens[idx_end_last_interesting].sync.time;
+	if(is_interesting)
+	{
+				
+		not_interesting_duration = tokens[idx_start].sync.time-tokens[idx_end_last_interesting].sync.time;
+		if(not_interesting_duration > TrsCLIOptions.min_time)
+		{
+			string text = get_tokens_text(ref tokens, idx_start_last_interesting, idx_end_last_interesting, ref ignore_filler, ref exclude_filler);
+			if(text.length > 0)
+			{
+				//Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, text);
+				Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, end_time, transform_to_asr_text(text).up());
+			}
+			idx_start_last_interesting = idx_start;
+		}
+		idx_end_last_interesting = idx;
+		end_time = transcription.episodes[0].sections[0].turns[0].end_time;
+	}
 	string text = get_tokens_text(ref tokens, idx_start_last_interesting, idx_end_last_interesting, ref ignore_filler, ref exclude_filler);
 	if(text.length > 0)
 	{
 		//Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, text);
-		Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, transform_to_asr_text(text).up());
+		Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, end_time, transform_to_asr_text(text).up());
 	}
     return 0;
 }
