@@ -772,6 +772,7 @@ namespace TrsCLIOptions
 	static double min_time = 0.0;
 	static string output = null;
 	static string domain_object = null;
+	static bool no_filler_break = false;
 	[CCode (array_length = false, array_null_terminated = true)]
 	static string[] filenames = null;
 	[CCode (array_length = false, array_null_terminated = true)]
@@ -790,6 +791,7 @@ namespace TrsCLIOptions
 		{ "ignore_filler", 'X', 0, OptionArg.STRING_ARRAY, ref ignore_filler, "Ignore filler from transcription", (string) "NONE" },
 		{ "exclude_filler", 'E', 0, OptionArg.STRING_ARRAY, ref exclude_filler, "Exclude filler from transcription", (string) "NONE" },
 		{ "include_filler", 'I', 0, OptionArg.STRING_ARRAY, ref include_filler, "Include filler from transcription", (string) "NONE" },
+		{ "no-filler-break", 'n', 0, OptionArg.NONE, ref no_filler_break, "Do not interrupt include filler", (string) "false" },
 		{ "text_transformation", 't', 0, OptionArg.STRING, ref text_transformation, "Text transformation to be applied (ASR, NONE)", (string) "ASR" },
 		{ null }
 	};
@@ -969,7 +971,21 @@ int main(string[] args) {
 				idx_end_last_interesting = idx;
 			}
 			idx_start = idx;
-			is_interesting = false;
+			if(TrsCLIOptions.no_filler_break)
+			{
+				if(is_in_include==0)
+				{
+					is_interesting = false;
+				}
+				else
+				{
+					idx_end_last_interesting = idx;
+				}
+			}
+			else
+			{
+				is_interesting = false;
+			}
 			break;
 		}
 		idx++;
