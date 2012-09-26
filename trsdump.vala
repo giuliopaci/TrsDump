@@ -780,6 +780,8 @@ namespace TrsCLIOptions
 	static string[] exclude_filler = null;
 	[CCode (array_length = false, array_null_terminated = true)]
 	static string[] include_filler = null;
+	[CCode (array_length = false, array_null_terminated = true)]
+	static string text_transformation = null;
 
 	static const OptionEntry[] Filter = {
 		{ "min-time", 'T', 0, OptionArg.DOUBLE, ref min_time, "Minimum interval time", (string) "0.0" },
@@ -788,6 +790,7 @@ namespace TrsCLIOptions
 		{ "ignore_filler", 'X', 0, OptionArg.STRING_ARRAY, ref ignore_filler, "Ignore filler from transcription", (string) "NONE" },
 		{ "exclude_filler", 'E', 0, OptionArg.STRING_ARRAY, ref exclude_filler, "Exclude filler from transcription", (string) "NONE" },
 		{ "include_filler", 'I', 0, OptionArg.STRING_ARRAY, ref include_filler, "Include filler from transcription", (string) "NONE" },
+		{ "text_transformation", 't', 0, OptionArg.STRING, ref text_transformation, "Text transformation to be applied (ASR, NONE)", (string) "ASR" },
 		{ null }
 	};
 
@@ -816,6 +819,8 @@ namespace Trs
 			}
 	}
 }
+
+static delegate string text_transformation(string text);
 
 int main(string[] args) {
 	try {
@@ -865,6 +870,22 @@ int main(string[] args) {
 		is_in_include++;
 	}
 	int is_in_exclude = 0;
+	text_transformation transf =  ( t => { return transform_to_asr_text(t).up(); } );
+	if(TrsCLIOptions.text_transformation != null)
+	{
+		switch(TrsCLIOptions.text_transformation)
+		{
+		case "ASR":
+			transf =  ( t => { return transform_to_asr_text(t).up(); } );
+			break;
+		case "NONE":
+			transf =  ( t => { return t; } );
+			break;
+		default:
+			transf =  ( t => { return t; } );
+			break;
+		}
+	}
 
 	bool is_interesting = false;
 	int idx_start = 0;
@@ -941,7 +962,7 @@ int main(string[] args) {
 					if(text.length > 0)
 					{
 						//Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, text);
-						Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, transform_to_asr_text(text).up());
+						Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, transf(text));
 					}
 					idx_start_last_interesting = idx_start;
 				}
@@ -965,7 +986,7 @@ int main(string[] args) {
 			if(text.length > 0)
 			{
 				//Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, text);
-				Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, end_time, transform_to_asr_text(text).up());
+				Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, end_time, transf(text));
 			}
 			idx_start_last_interesting = idx_start;
 		}
@@ -976,7 +997,7 @@ int main(string[] args) {
 	if(text.length > 0)
 	{
 		//Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, tokens[idx_end_last_interesting].sync.time, text);
-		Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, end_time, transform_to_asr_text(text).up());
+		Posix.stdout.printf("%f %f %s\n", tokens[idx_start_last_interesting].sync.time, end_time, transf(text));
 	}
     return 0;
 }
