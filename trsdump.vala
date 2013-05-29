@@ -851,17 +851,17 @@ int main(string[] args) {
 //	Posix.stderr.printf("%f\n", transcription.episodes[0].sections[0].turns[0].start_time);
 //	Posix.stderr.printf("%f\n", transcription.episodes[0].sections[0].turns[0].end_time);
 
-	HashTable<string,bool> ignore_filler = new HashTable<string,bool>( str_hash, str_equal);
+	GLib.HashTable<string,bool> ignore_filler = new GLib.HashTable<string,bool>( str_hash, str_equal);
 	foreach(string filler in TrsCLIOptions.ignore_filler)
 	{
 		ignore_filler.insert(filler, true);
 	}
-	HashTable<string,bool> exclude_filler = new HashTable<string,bool>( str_hash, str_equal);
+	GLib.HashTable<string,bool> exclude_filler = new GLib.HashTable<string,bool>( str_hash, str_equal);
 	foreach(string filler in TrsCLIOptions.exclude_filler)
 	{
 		exclude_filler.insert(filler, true);
 	}
-	HashTable<string,bool> include_filler = new HashTable<string,bool>( str_hash, str_equal);
+	GLib.HashTable<string,bool> include_filler = new GLib.HashTable<string,bool>( str_hash, str_equal);
 	foreach(string filler in TrsCLIOptions.include_filler)
 	{
 		include_filler.insert(filler, true);
@@ -1018,7 +1018,7 @@ int main(string[] args) {
     return 0;
 }
 
-string get_tokens_text(ref Trs.TurnToken[] tokens, int idx_start, int idx_end, ref HashTable<string,bool> ignore_filler, ref HashTable<string,bool> exclude_filler)
+string get_tokens_text(ref Trs.TurnToken[] tokens, int idx_start, int idx_end, ref GLib.HashTable<string,bool> ignore_filler, ref GLib.HashTable<string,bool> exclude_filler)
 {
 	int is_in_exclude = 0;
 	var builder = new StringBuilder ("");
@@ -1098,6 +1098,10 @@ string transform_to_asr_text(string text)
 		r = TokenizerR(){ fragment_out = 0, regex = rx };
 		rules += r;
 
+		rx = new Regex("LETTER:[[:alpha:]][\\p{L}_]*", RegexCompileFlags.OPTIMIZE);
+		r = TokenizerR(){ fragment_out = 0, regex = rx };
+		rules += r;
+
 		rx = new Regex("([\\p{L}_]*[^aeiouyAEIOUY]')([aeiouyAEIOUY][\\p{L}_])", RegexCompileFlags.OPTIMIZE);
 		r = TokenizerR(){ fragment_out = 1, regex = rx };
 		rules += r;
@@ -1120,18 +1124,20 @@ string transform_to_asr_text(string text)
 		exit(-1);
 	}
 	string[] token_tokens = tokenize(rules, text);
+	var number_rex = new Regex("^(CA|O)RD:[[:digit:]]+$", RegexCompileFlags.OPTIMIZE);
+	var letter_rex = new Regex("^LETTER:([[:alpha:]])$", RegexCompileFlags.OPTIMIZE);
+	var punct_rex = new Regex("^[^\\p{L}]*$", RegexCompileFlags.OPTIMIZE);
+	var filler_rex = new Regex("^<.*>$", RegexCompileFlags.OPTIMIZE);
 	foreach(string mtk in token_tokens)
 	{
 		MatchInfo match;
-		var punct = new Regex("^[^\\p{L}]*$", RegexCompileFlags.OPTIMIZE);
 		Posix.stderr.printf ("Token \"%s\"\n", mtk);
-		if ( punct.match_full(mtk, -1, 0, 0, out match ) )
+		if ( punct_rex.match_full(mtk, -1, 0, 0, out match ) )
 		{
 			Posix.stderr.printf ("Match \"%s\"\n", mtk);
 			continue;
 		}
-		var filler = new Regex("^<.*>$", RegexCompileFlags.OPTIMIZE);
-		if ( filler.match_full(mtk, -1, 0, 0, out match ) )
+		if ( filler_rex.match_full(mtk, -1, 0, 0, out match ) )
 		{
 			Posix.stderr.printf ("Fill  \"%s\"\n", mtk);
 		}
@@ -1149,21 +1155,36 @@ string transform_to_asr_text(string text)
 			builder.append(tks[0]);
 			break;
 		case 2:
-			var number = new Regex("^(CA|O)RD:[[:digit:]]+$", RegexCompileFlags.OPTIMIZE);
-			if( number.match_full(tks[0], -1, 0, 0, out match ) )
+			if( number_rex.match_full(tks[0], -1, 0, 0, out match ) )
 			{
 				Posix.stderr.printf ("Fix   \"%s\"\n", tks[1]);
 				builder.append(tks[1]);
 			}
 			else
 			{
-				Posix.stderr.printf ("Fix   \"%s\"\n", tks[0]);
-				builder.append(tks[0]);
+				if( letter_rex.match_full(tks[0], -1, 0, 0, out match ) )
+				{
+					Posix.stderr.printf ("Fix   \"%s\"\n", match.fetch(1));
+					builder.append(match.fetch(1));
+				}
+				else
+				{
+					Posix.stderr.printf ("Fix   \"%s\"\n", tks[0]);
+					builder.append(tks[0]);
+				}
 			}
 			break;
 		case 3:
-			Posix.stderr.printf ("Fix   \"%s\"\n", tks[1]);
-			builder.append(tks[1]);
+			if( letter_rex.match_full(tks[0], -1, 0, 0, out match ) )
+			{
+				Posix.stderr.printf ("Fix   \"%s\"\n", match.fetch(1));
+				builder.append(match.fetch(1));
+			}
+			else
+			{
+				Posix.stderr.printf ("Fix   \"%s\"\n", tks[1]);
+				builder.append(tks[1]);
+			}
 			break;
 		}
 		foreach(string microtk in tks)
