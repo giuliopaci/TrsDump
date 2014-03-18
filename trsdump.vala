@@ -1102,6 +1102,10 @@ string transform_to_asr_text(string text)
 		r = TokenizerR(){ fragment_out = 0, regex = rx };
 		rules += r;
 
+		rx = new Regex("(ACRONYM|MISUNDERSTANDING):[\\p{L}]+[\\p{L}_]*", RegexCompileFlags.OPTIMIZE);
+		r = TokenizerR(){ fragment_out = 0, regex = rx };
+		rules += r;
+
 		rx = new Regex("([\\p{L}_]*[^aeiouyAEIOUY]')([aeiouyAEIOUY][\\p{L}_])", RegexCompileFlags.OPTIMIZE);
 		r = TokenizerR(){ fragment_out = 1, regex = rx };
 		rules += r;
@@ -1126,6 +1130,8 @@ string transform_to_asr_text(string text)
 	string[] token_tokens = tokenize(rules, text);
 	var number_rex = new Regex("^(CA|O)RD:[[:digit:]]+$", RegexCompileFlags.OPTIMIZE);
 	var letter_rex = new Regex("^LETTER:([[:alpha:]])$", RegexCompileFlags.OPTIMIZE);
+	var acronym_rex = new Regex("^ACRONYM:([\\p{L}]+)$", RegexCompileFlags.OPTIMIZE);
+	var misunderstanding_rex = new Regex("^MISUNDERSTANDING:([\\p{L}]+)$", RegexCompileFlags.OPTIMIZE);
 	var punct_rex = new Regex("^[^\\p{L}]*$", RegexCompileFlags.OPTIMIZE);
 	var filler_rex = new Regex("^<.*>$", RegexCompileFlags.OPTIMIZE);
 	foreach(string mtk in token_tokens)
@@ -1167,6 +1173,16 @@ string transform_to_asr_text(string text)
 					Posix.stderr.printf ("Fix   \"%s\"\n", match.fetch(1));
 					builder.append(match.fetch(1));
 				}
+				else if( acronym_rex.match_full(tks[0], -1, 0, 0, out match ) )
+				{
+					Posix.stderr.printf ("Fix   \"%s\"\n", match.fetch(1));
+					builder.append(match.fetch(1));
+				}
+				else if( misunderstanding_rex.match_full(tks[0], -1, 0, 0, out match ) )
+				{
+					Posix.stderr.printf ("Fix   \"%s\"\n", match.fetch(1));
+					builder.append(match.fetch(1));
+				}
 				else
 				{
 					Posix.stderr.printf ("Fix   \"%s\"\n", tks[0]);
@@ -1176,6 +1192,16 @@ string transform_to_asr_text(string text)
 			break;
 		case 3:
 			if( letter_rex.match_full(tks[0], -1, 0, 0, out match ) )
+			{
+				Posix.stderr.printf ("Fix   \"%s\"\n", match.fetch(1));
+				builder.append(match.fetch(1));
+			}
+			else if( acronym_rex.match_full(tks[0], -1, 0, 0, out match ) )
+			{
+				Posix.stderr.printf ("Fix   \"%s\"\n", match.fetch(1));
+				builder.append(match.fetch(1));
+			}
+			else if( misunderstanding_rex.match_full(tks[0], -1, 0, 0, out match ) )
 			{
 				Posix.stderr.printf ("Fix   \"%s\"\n", match.fetch(1));
 				builder.append(match.fetch(1));
