@@ -1094,27 +1094,27 @@ string transform_to_asr_text(string text)
 		r = TokenizerR(){ fragment_out = 0, regex = rx };
 		rules += r;
 
-		rx = new Regex("(CA|O)RD:[[:digit:]]+[\\p{L}_]*", RegexCompileFlags.OPTIMIZE);
+		rx = new Regex("(CA|O)RD:[[:digit:]]+[\\p{L}_/]*", RegexCompileFlags.OPTIMIZE);
 		r = TokenizerR(){ fragment_out = 0, regex = rx };
 		rules += r;
 
-		rx = new Regex("LETTER:[[:alpha:]][\\p{L}_]*", RegexCompileFlags.OPTIMIZE);
+		rx = new Regex("LETTER:[[:alpha:]][\\p{L}_/]*", RegexCompileFlags.OPTIMIZE);
 		r = TokenizerR(){ fragment_out = 0, regex = rx };
 		rules += r;
 
-		rx = new Regex("(ACRONYM|MISUNDERSTANDING):[\\p{L}]+[\\p{L}_]*", RegexCompileFlags.OPTIMIZE);
+		rx = new Regex("(ACRONYM|MISUNDERSTANDING):[\\p{L}]+[\\p{L}_/]*", RegexCompileFlags.OPTIMIZE);
 		r = TokenizerR(){ fragment_out = 0, regex = rx };
 		rules += r;
 
-		rx = new Regex("([\\p{L}_]*[^aeiouyAEIOUY]')([aeiouyAEIOUY][\\p{L}_])", RegexCompileFlags.OPTIMIZE);
+		rx = new Regex("([\\p{L}_/]*[^aeiouyAEIOUY]')([aeiouyAEIOUY][\\p{L}_/])", RegexCompileFlags.OPTIMIZE);
 		r = TokenizerR(){ fragment_out = 1, regex = rx };
 		rules += r;
 
-		rx = new Regex("([\\p{L}_]*[^aeiouAEIOU]')", RegexCompileFlags.OPTIMIZE);
+		rx = new Regex("([\\p{L}_/]*[^aeiouAEIOU]')", RegexCompileFlags.OPTIMIZE);
 		r = TokenizerR(){ fragment_out = 1, regex = rx };
 		rules += r;
 
-		rx = new Regex("[\\p{L}_[:digit:]º°<>-]+", RegexCompileFlags.OPTIMIZE);
+		rx = new Regex("[\\p{L}_/[:digit:]º°<>-]+", RegexCompileFlags.OPTIMIZE);
 		r = TokenizerR(){ fragment_out = 0, regex = rx };
 		rules += r;
 
